@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0e1a14"/>
+  <meta name="description" content="CastMate – Pacific Northwest fishing companion"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="CastMate"/>
+  <title>CastMate – PNW Fishing</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/icon-192.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root {
+      height: 100%;
+      background: #0e1a14;
+      overflow-x: hidden;
+    }
+    body {
+      font-family: 'Source Sans 3', 'Helvetica Neue', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+    /* Safe area for notched phones */
+    #root {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-thumb { background: #1a4a2e; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React 18 via CDN -->
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel standalone for JSX transform -->
+
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel" data-type="module">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    /* ─────────────────────────────────────────────────────────
+       STATIC DATA
+    ───────────────────────────────────────────────────────── */
+    const SPOTS = [
+      { id:1, name:"Green Lake",       type:"Lake",   fish:["Bass","Perch","Crappie"],    rating:4.5, lat:47.6808, lng:-122.3298, tip:"Early morning near the dock yields the best bass." },
+      { id:2, name:"Lake Union",       type:"Lake",   fish:["Cutthroat","Bass","Carp"],   rating:4.1, lat:47.6436, lng:-122.3353, tip:"Try the west shore near the houseboats at dusk." },
+      { id:3, name:"Snoqualmie River", type:"River",  fish:["Steelhead","Salmon","Trout"],rating:4.8, lat:47.5301, lng:-121.834,  tip:"Fall run salmon are epic — bring heavier gear." },
+      { id:4, name:"Lake Sammamish",   type:"Lake",   fish:["Kokanee","Bass","Perch"],    rating:4.6, lat:47.5826, lng:-122.074,  tip:"Kokanee love the deep middle channel in summer." },
+      { id:5, name:"Issaquah Creek",   type:"Stream", fish:["Coho","Cutthroat"],          rating:3.9, lat:47.5432, lng:-122.0321, tip:"Short window for coho in late October." },
+      { id:6, name:"Burke-Gilman",     type:"Urban",  fish:["Bass","Carp"],               rating:3.5, lat:47.6601, lng:-122.314,  tip:"Great for a casual after-work session." },
+    ];
+
+    const GEAR_CATALOG = [
+      { id:"g1", name:"Ugly Stik GX2 6'6\"",    type:"Rod",  brand:"Shakespeare", weight:"Med-Heavy",  condition:"Great",        notes:"Go-to bass rod",                   qr:"UGLYSTIK-GX2-66MH"   },
+      { id:"g2", name:"Shimano Stradic FL 2500", type:"Reel", brand:"Shimano",     weight:"2500",        condition:"Good",         notes:"Smooth drag, all-around workhorse", qr:"SHIMANO-STRADIC-2500" },
+      { id:"g3", name:"Berkley Trilene 12lb",    type:"Line", brand:"Berkley",     weight:"12lb Mono",   condition:"Replace Soon", notes:"Getting old — swap before next trip",qr:"BERKLEY-TRILENE-12"  },
+      { id:"g4", name:"Rapala Original F07",     type:"Lure", brand:"Rapala",      weight:"F07",         condition:"Great",        notes:"Lucky lure, 3 bass last July",      qr:"RAPALA-ORIGINAL-F07" },
+      { id:"g5", name:"PowerBait 4\" Worms",     type:"Bait", brand:"Berkley",     weight:'4"',          condition:"Good",         notes:"Green pumpkin & watermelon",        qr:"POWERBAIT-4IN-WORM"  },
+      { id:"g6", name:"Mepps Aglia #3",          type:"Lure", brand:"Mepps",       weight:"#3",          condition:"Good",         notes:"Killer for trout in moving water",  qr:"MEPPS-AGLIA-3"       },
+      { id:"g7", name:"Ugly Stik Carbon 7'",     type:"Rod",  brand:"Shakespeare", weight:"Medium",      condition:"Great",        notes:"Light action trout rod",            qr:"UGLYSTIK-CARBON-7M"  },
+      { id:"g8", name:"Daiwa BG 3000",           type:"Reel", brand:"Daiwa",       weight:"3000",        condition:"Great",        notes:"Saltwater capable, buttery smooth", qr:"DAIWA-BG-3000"       },
+    ];
+
+    const CHALLENGES = [
+      { id:"c1",  title:"First Cast",      desc:"Log your very first catch",    icon:"🎣", xp:50,  target:1,   field:"totalCatches", tier:"bronze" },
+      { id:"c2",  title:"Limit Out",       desc:"5 catches in one month",       icon:"🏆", xp:150, target:5,   field:"monthCatches", tier:"silver" },
+      { id:"c3",  title:"Species Hunter",  desc:"Catch 5 different species",    icon:"🔭", xp:200, target:5,   field:"species",      tier:"silver" },
+      { id:"c4",  title:"Big Fish Energy", desc:"Land a fish over 20 inches",   icon:"📏", xp:250, target:1,   field:"bigFish",      tier:"gold"   },
+      { id:"c5",  title:"Century Club",    desc:"Log 100 total catches",        icon:"💯", xp:500, target:100, field:"totalCatches", tier:"gold"   },
+      { id:"c6",  title:"Spot Explorer",   desc:"Fish 4 different spots",       icon:"🗺️", xp:175, target:4,   field:"spots",        tier:"silver" },
+      { id:"c7",  title:"Early Bird",      desc:"3 catches before 7 AM",        icon:"🌅", xp:125, target:3,   field:"earlyBird",    tier:"bronze" },
+      { id:"c8",  title:"Photo Angler",    desc:"Photos on 10 catches",         icon:"📸", xp:100, target:10,  field:"photos",       tier:"bronze" },
+      { id:"c9",  title:"River Rat",       desc:"Catch a Steelhead or Salmon",  icon:"🌊", xp:300, target:1,   field:"steelhead",    tier:"gold"   },
+      { id:"c10", title:"Night Owl",       desc:"3 catches after 8 PM",         icon:"🦉", xp:125, target:3,   field:"nightOwl",     tier:"bronze" },
+    ];
+
+    const AVATARS  = ["🎣","🌲","🐟","🦅","🏔️","🌊","🦌","🌿","⛵","🪵","🐻","🌧️"];
+    const MONTHS   = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const WEATHER  = { temp:52, condition:"Overcast", wind:"6 mph NW", fishingIndex:78, bestWindow:"5:30–8:30 AM & 6–8 PM" };
+    const TYPE_ICO = { Rod:"🎣", Reel:"🔄", Line:"〰️", Lure:"🪝", Bait:"🐛", Other:"📦" };
+    const COND_CLR = { "Great":"#7dd3a8","Good":"#a3c4bc","Replace Soon":"#e8a87c","Replace":"#d4756b" };
+    const TIER_CLR = { bronze:"#c97c3a", silver:"#a8b8b4", gold:"#c9a227" };
+
+    /* ── localStorage helpers ── */
+    function lsGet(key, fb){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):fb; }catch{ return fb; } }
+    function lsSet(key, v){ try{ localStorage.setItem(key,JSON.stringify(v)); }catch{} }
+    function uid(){ return Math.random().toString(36).slice(2,10); }
+    function calcDist(a,b,c,d){ const R=3958.8,dL=(c-a)*Math.PI/180,dG=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dG/2)**2; return (R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))).toFixed(1); }
+    function groupByMonth(list){ const m={}; list.forEach(c=>{ const d=new Date(c.date),k=`${d.getFullYear()}-${String(d.getMonth()).padStart(2,"0")}`; if(!m[k])m[k]=[]; m[k].push(c); }); return m; }
+
+    /* ── Theme ── */
+    const T = {
+      bg:"#0e1a14", bgMid:"#152a1e",
+      bgCard:"rgba(255,255,255,0.045)", border:"rgba(255,255,255,0.07)", borderAcc:"rgba(125,211,168,0.35)",
+      pine:"#1a4a2e", moss:"#4a7c59", mist:"#b8d4c8",
+      snow:"#e8f0ec", fog:"rgba(232,240,236,0.45)",
+      accent:"#7dd3a8", accentDim:"#4a9970",
+      gold:"#c9a227", warning:"#e8a87c", danger:"#d4756b",
+      display:"'Playfair Display', Georgia, serif",
+      body:"'Source Sans 3', 'Helvetica Neue', sans-serif",
+    };
+    const IN = { background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:10, padding:"10px 14px", color:T.snow, fontFamily:T.body, fontSize:14, width:"100%", outline:"none" };
+
+    /* ── Small components ── */
+    function Pill({ children, active, onClick, danger }){
+      return <span onClick={onClick} style={{ display:"inline-flex",alignItems:"center",gap:4,cursor:"pointer",padding:"5px 12px",borderRadius:20,fontSize:12,fontFamily:T.body,fontWeight:600,transition:"all .15s",background:danger?"rgba(212,117,107,0.15)":active?T.pine:"rgba(255,255,255,0.06)",color:danger?T.danger:active?T.accent:T.fog,border:danger?"1px solid rgba(212,117,107,0.3)":active?`1px solid ${T.borderAcc}`:"1px solid transparent" }}>{children}</span>;
+    }
+    function Card({ children, active, onClick, style={} }){
+      return <div onClick={onClick} style={{ background:active?"rgba(26,74,46,0.35)":T.bgCard,border:`1px solid ${active?T.borderAcc:T.border}`,borderRadius:14,padding:"12px 14px",cursor:onClick?"pointer":"default",transition:"all .2s",...style }}>{children}</div>;
+    }
+    function Lbl({ children }){
+      return <div style={{ fontFamily:T.body,fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:T.fog,marginBottom:5 }}>{children}</div>;
+    }
+    function Bar({ pct, done }){
+      return <div style={{ height:5,background:"rgba(255,255,255,0.07)",borderRadius:10,overflow:"hidden" }}><div style={{ width:`${pct}%`,height:"100%",borderRadius:10,transition:"width .6s ease",background:done?`linear-gradient(90deg,${T.accent},${T.mist})`:`linear-gradient(90deg,${T.moss},${T.accent})` }}/></div>;
+    }
+    function Sheet({ show, onClose, title, children }){
+      if(!show) return null;
+      return <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.72)",zIndex:300,display:"flex",flexDirection:"column",justifyContent:"flex-end" }} onClick={onClose}>
+        <div style={{ background:`linear-gradient(180deg,${T.bgMid},${T.bg})`,borderRadius:"22px 22px 0 0",padding:"20px 18px 32px",borderTop:`2px solid ${T.borderAcc}`,maxHeight:"92vh",overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+          {title && <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18 }}>
+            <div style={{ fontFamily:T.display,fontSize:20,color:T.snow }}>{title}</div>
+            <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)",border:"none",borderRadius:"50%",width:30,height:30,color:T.fog,fontSize:16,cursor:"pointer" }}>✕</button>
+          </div>}
+          {children}
+        </div>
+      </div>;
+    }
+    function PrimaryBtn({ children, onClick, disabled, outline, style={} }){
+      return <button onClick={onClick} disabled={disabled} style={{ width:"100%",padding:"13px",borderRadius:12,cursor:disabled?"not-allowed":"pointer",fontFamily:T.display,fontSize:16,fontWeight:600,background:outline?"transparent":`linear-gradient(135deg,${T.pine},#0d3320)`,border:`1.5px solid ${outline?T.borderAcc:"rgba(125,211,168,0.22)"}`,color:T.accent,opacity:disabled?0.5:1,transition:"all .2s",...style }}>{children}</button>;
+    }
+
+    /* ════════════════════════════════════════════════════════
+       MAIN APP COMPONENT
+    ════════════════════════════════════════════════════════ */
+    function CastMate(){
+      const [profile,     setProfile]     = useState(()=>lsGet("cm_profile",null));
+      const [setupDraft,  setSetupDraft]  = useState({ username:"", avatar:"🎣", bio:"" });
+      const [setupError,  setSetupError]  = useState("");
+      const [editingProfile, setEditingProfile] = useState(false);
+
+      const [catches,  setCatches]  = useState(()=>lsGet("cm_catches",[]));
+      const [gearList, setGearList] = useState(()=>lsGet("cm_gear",GEAR_CATALOG.slice(0,5)));
+
+      useEffect(()=>lsSet("cm_catches",catches),[catches]);
+      useEffect(()=>lsSet("cm_gear",gearList),[gearList]);
+      useEffect(()=>{ if(profile) lsSet("cm_profile",profile); },[profile]);
+
+      const [tab,          setTab]          = useState("map");
+      const [userPos,      setUserPos]      = useState(null);
+      const [posError,     setPosError]     = useState(null);
+      const [selSpot,      setSelSpot]      = useState(null);
+      const [gearFilter,   setGearFilter]   = useState("All");
+      const [gearSearch,   setGearSearch]   = useState("");
+      const [qrMode,       setQrMode]       = useState(false);
+      const [qrInput,      setQrInput]      = useState("");
+      const [qrResult,     setQrResult]     = useState(null);
+      const [deleteConfirm,setDeleteConfirm]= useState(null);
+      const [clearConfirm, setClearConfirm] = useState(false);
+      const [showAddGear,  setShowAddGear]  = useState(false);
+      const [newGear,      setNewGear]      = useState({ name:"",type:"Rod",brand:"",weight:"",condition:"Good",notes:"" });
+      const [aiMessages,   setAiMessages]   = useState([{ role:"assistant",text:"Hey! I'm your PNW fishing guide 🌲 Ask me about local spots, what's biting, or gear for the Seattle area." }]);
+      const [aiInput,      setAiInput]      = useState("");
+      const [aiLoading,    setAiLoading]    = useState(false);
+      const [stratSpot,    setStratSpot]    = useState(null);
+      const [stratLoading, setStratLoading] = useState(false);
+      const [stratResult,  setStratResult]  = useState(null);
+      const [albumDate,    setAlbumDate]    = useState({ year:new Date().getFullYear(), month:new Date().getMonth() });
+      const [selCatch,     setSelCatch]     = useState(null);
+      const [showAddCatch, setShowAddCatch] = useState(false);
+      const [scanLoading,  setScanLoading]  = useState(false);
+      const [newCatch,     setNewCatch]     = useState({ species:"",length:"",weight:"",spot:"",notes:"",lure:"",photo:null,_scan:null });
+
+      const mapRef    = useRef(null);
+      const chatEnd   = useRef(null);
+      const photoRef  = useRef(null);
+      const importRef = useRef(null);
+      const watchRef  = useRef(null);
+
+      /* GPS */
+      useEffect(()=>{
+        if(!navigator.geolocation){ setPosError("GPS not available"); return; }
+        watchRef.current = navigator.geolocation.watchPosition(
+          p=>setUserPos({lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy}),
+          e=>setPosError(e.message),
+          {enableHighAccuracy:true,maximumAge:5000,timeout:10000}
+        );
+        return()=>navigator.geolocation.clearWatch(watchRef.current);
+      },[]);
+
+      useEffect(()=>{chatEnd.current?.scrollIntoView({behavior:"smooth"});},[aiMessages]);
+      useEffect(()=>{ if(tab==="map") drawMap(); },[tab,userPos,selSpot]);
+
+      /* ── MAP ── */
+      function rrect(ctx,x,y,w,h,r){ ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath(); }
+
+      const drawMap = useCallback(()=>{
+        const canvas=mapRef.current; if(!canvas)return;
+        const ctx=canvas.getContext("2d"),W=canvas.width,H=canvas.height;
+        const center=userPos||{lat:47.62,lng:-122.18};
+        const scale=110000*(W/600);
+        const toXY=(lat,lng)=>({ x:W/2+(lng-center.lng)*scale*Math.cos(center.lat*Math.PI/180), y:H/2-(lat-center.lat)*scale });
+
+        const bgG=ctx.createLinearGradient(0,0,W,H); bgG.addColorStop(0,"#0c1a12"); bgG.addColorStop(1,"#0e1e1a");
+        ctx.fillStyle=bgG; ctx.fillRect(0,0,W,H);
+        ctx.strokeStyle="rgba(255,255,255,0.025)"; ctx.lineWidth=1;
+        for(let i=0;i<W;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke();}
+        for(let i=0;i<H;i+=40){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W,i);ctx.stroke();}
+
+        [{lat:47.6808,lng:-122.3298,r:34},{lat:47.6436,lng:-122.3353,r:28},{lat:47.5826,lng:-122.074,r:38}].forEach(w=>{
+          const p=toXY(w.lat,w.lng),g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,w.r);
+          g.addColorStop(0,"rgba(58,107,122,0.45)");g.addColorStop(0.6,"rgba(30,70,90,0.2)");g.addColorStop(1,"rgba(30,70,90,0)");
+          ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,w.r,0,Math.PI*2);ctx.fill();
+        });
+
+        SPOTS.forEach(sp=>{
+          const p=toXY(sp.lat,sp.lng),isSel=selSpot?.id===sp.id;
+          if(isSel){ctx.beginPath();ctx.arc(p.x,p.y,24,0,Math.PI*2);ctx.fillStyle="rgba(125,211,168,0.12)";ctx.fill();ctx.strokeStyle="rgba(125,211,168,0.3)";ctx.lineWidth=1.5;ctx.stroke();}
+          ctx.beginPath();ctx.arc(p.x+2,p.y+3,isSel?12:9,0,Math.PI*2);ctx.fillStyle="rgba(0,0,0,0.4)";ctx.fill();
+          const pg=ctx.createRadialGradient(p.x-2,p.y-2,0,p.x,p.y,isSel?12:9);
+          pg.addColorStop(0,isSel?"#b0e8cc":"#7dd3a8");pg.addColorStop(1,isSel?"#2d7a52":"#1a4a2e");
+          ctx.beginPath();ctx.arc(p.x,p.y,isSel?12:9,0,Math.PI*2);ctx.fillStyle=pg;ctx.fill();
+          ctx.beginPath();ctx.arc(p.x,p.y,isSel?4:3,0,Math.PI*2);ctx.fillStyle="rgba(255,255,255,0.9)";ctx.fill();
+          if(isSel){
+            ctx.font="600 11px 'Source Sans 3',sans-serif";ctx.textAlign="center";
+            const tw=ctx.measureText(sp.name).width;
+            ctx.fillStyle="rgba(14,26,20,0.88)";rrect(ctx,p.x-tw/2-8,p.y-40,tw+16,20,6);ctx.fill();
+            ctx.fillStyle=T.accent;ctx.textBaseline="middle";ctx.fillText(sp.name,p.x,p.y-30);
+          }else{
+            ctx.font="500 9px 'Source Sans 3',sans-serif";ctx.textAlign="center";ctx.textBaseline="top";
+            ctx.fillStyle="rgba(184,212,200,0.7)";ctx.fillText(sp.name,p.x,p.y+14);
+          }
+        });
+
+        if(userPos){
+          const p=toXY(userPos.lat,userPos.lng);
+          ctx.beginPath();ctx.arc(p.x,p.y,20,0,Math.PI*2);ctx.fillStyle="rgba(96,165,250,0.14)";ctx.fill();
+          ctx.beginPath();ctx.arc(p.x,p.y,7,0,Math.PI*2);ctx.fillStyle="#60a5fa";ctx.fill();
+          ctx.strokeStyle="rgba(255,255,255,0.9)";ctx.lineWidth=2;ctx.stroke();
+          ctx.font="bold 8px 'Source Sans 3',sans-serif";ctx.textAlign="center";ctx.textBaseline="top";
+          ctx.fillStyle="rgba(184,212,200,0.8)";ctx.fillText("You",p.x,p.y+11);
+        }
+
+        ctx.fillStyle="rgba(14,26,20,0.8)";rrect(ctx,W-46,10,34,34,8);ctx.fill();
+        ctx.strokeStyle="rgba(125,211,168,0.25)";ctx.lineWidth=1;rrect(ctx,W-46,10,34,34,8);ctx.stroke();
+        ctx.font="bold 11px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillStyle="rgba(184,212,200,0.7)";ctx.fillText("N",W-29,22);ctx.fillStyle=T.accent;ctx.fillText("▲",W-29,31);
+      },[userPos,selSpot]);
+
+      function handleMapClick(e){
+        const canvas=mapRef.current,rect=canvas.getBoundingClientRect();
+        const cx=e.clientX-rect.left,cy=e.clientY-rect.top,W=canvas.width,H=canvas.height;
+        const center=userPos||{lat:47.62,lng:-122.18},scale=110000*(W/600);
+        let hit=null,minD=Infinity;
+        SPOTS.forEach(sp=>{ const px=W/2+(sp.lng-center.lng)*scale*Math.cos(center.lat*Math.PI/180),py=H/2-(sp.lat-center.lat)*scale,d=Math.hypot(cx-px,cy-py); if(d<28&&d<minD){minD=d;hit=sp;} });
+        setSelSpot(hit===selSpot?null:hit);
+      }
+
+      /* ── Profile setup ── */
+      function saveProfile(draft){
+        const t=draft.username.trim();
+        if(!t){setSetupError("Please enter a name.");return;}
+        if(t.length<2){setSetupError("Name needs at least 2 characters.");return;}
+        setProfile({username:t,avatar:draft.avatar,bio:draft.bio.trim()});
+        setEditingProfile(false); setSetupError("");
+      }
+
+      /* ── AI Buddy ── */
+      async function sendAi(){
+        if(!aiInput.trim()||aiLoading)return;
+        const msg=aiInput.trim();setAiInput("");setAiMessages(p=>[...p,{role:"user",text:msg}]);setAiLoading(true);
+        const sys=`You are a PNW fishing guide for the Seattle/Kirkland area. Spots: ${SPOTS.map(s=>`${s.name}(${s.type}:${s.fish})`).join("; ")}. Conditions: ${WEATHER.temp}°F ${WEATHER.condition} wind:${WEATHER.wind} index:${WEATHER.fishingIndex}/100. Be friendly, knowledgeable about PNW fishing. 2-4 sentences, occasional emoji.`;
+        try{
+          const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:sys,messages:[...aiMessages.slice(1).map(m=>({role:m.role,content:m.text})),{role:"user",content:msg}]})});
+          const d=await r.json();
+          setAiMessages(p=>[...p,{role:"assistant",text:d.content?.[0]?.text||"The fog's rolling in — try again!"}]);
+        }catch{setAiMessages(p=>[...p,{role:"assistant",text:"Lost signal in the mist! Try again 🌲"}]);}
+        setAiLoading(false);
+      }
+
+      /* ── Strategy ── */
+      async function generateStrategy(spot){
+        setStratSpot(spot);setStratResult(null);setStratLoading(true);
+        const gear=gearList.map(g=>`${g.name}(${g.type},${g.condition})`).join(", ");
+        const prompt=`PNW expert guide. Spot: ${spot.name} (${spot.type}). Fish: ${spot.fish.join(", ")}. Gear: ${gear}. Conditions: ${WEATHER.temp}°F ${WEATHER.condition} wind:${WEATHER.wind} best:${WEATHER.bestWindow}.\nONLY valid JSON no markdown:\n{"overview":"","techniques":[{"name":"","description":"","gearMatch":"","difficulty":"Beginner|Intermediate|Advanced"}],"rigging":"","timing":"","proTip":""}`;
+        try{
+          const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+          const d=await r.json();
+          setStratResult(JSON.parse(d.content?.[0]?.text?.replace(/```json|```/g,"").trim()||"{}"));
+        }catch{setStratResult({overview:"Couldn't generate strategy.",techniques:[],proTip:""});}
+        setStratLoading(false);
+      }
+
+      /* ── Fish scan ── */
+      async function scanFish(base64,mime){
+        setScanLoading(true);
+        try{
+          const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mime,data:base64}},{type:"text",text:`Fish ID expert. ONLY valid JSON no markdown:\n{"species":"","commonName":"","confidence":"High|Medium|Low","estimatedLength":"X inches","estimatedWeight":"X.X lbs","characteristics":"","notes":"PNW tips"}`}]}]})});
+          const d=await r.json();
+          return JSON.parse(d.content?.[0]?.text?.replace(/```json|```/g,"").trim()||"{}");
+        }catch{return null;}
+        finally{setScanLoading(false);}
+      }
+
+      async function handlePhoto(e,mode){
+        const file=e.target.files?.[0];if(!file)return;
+        const reader=new FileReader();
+        reader.onload=async ev=>{
+          const dataUrl=ev.target.result,base64=dataUrl.split(",")[1],mime=file.type||"image/jpeg";
+          if(mode==="new"){
+            setNewCatch(p=>({...p,photo:dataUrl}));
+            const res=await scanFish(base64,mime);
+            if(res)setNewCatch(p=>({...p,species:res.commonName||res.species||p.species,length:res.estimatedLength?.replace(/[^\d.]/g,"")||p.length,weight:res.estimatedWeight?.replace(/[^\d.]/g,"")||p.weight,_scan:res}));
+          }else{
+            const res=await scanFish(base64,mime);
+            setCatches(p=>[{id:"c"+uid(),species:res?.commonName||res?.species||"Unknown",length:res?.estimatedLength?.replace(/[^\d.]/g,"")||"",weight:res?.estimatedWeight?.replace(/[^\d.]/g,"")||"",spot:"",date:new Date().toISOString(),photo:dataUrl,notes:res?.notes||"",lure:"",_scan:res},...p]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function saveCatch(){
+        if(!newCatch.species.trim())return;
+        setCatches(p=>[{...newCatch,id:"c"+uid(),date:new Date().toISOString()},...p]);
+        setNewCatch({species:"",length:"",weight:"",spot:"",notes:"",lure:"",photo:null,_scan:null});
+        setShowAddCatch(false);
+      }
+
+      /* ── Gear ── */
+      function handleQrAdd(){ const code=qrInput.trim().toUpperCase();if(!code)return;const found=GEAR_CATALOG.find(g=>g.qr===code);if(found){if(gearList.find(g=>g.id===found.id))setQrResult({status:"already",item:found});else{setGearList(p=>[...p,found]);setQrResult({status:"added",item:found});}}else setQrResult({status:"notfound",code});setQrInput(""); }
+      function handleGearSearch(q){ setGearSearch(q);if(!q.trim()){setQrResult(null);return;}const matches=GEAR_CATALOG.filter(g=>!gearList.find(x=>x.id===g.id)&&(g.name.toLowerCase().includes(q.toLowerCase())||g.brand.toLowerCase().includes(q.toLowerCase())||g.type.toLowerCase().includes(q.toLowerCase())));setQrResult({status:"search",matches}); }
+      function addCustomGear(){ if(!newGear.name.trim())return;setGearList(p=>[...p,{...newGear,id:"g"+uid(),qr:""}]);setNewGear({name:"",type:"Rod",brand:"",weight:"",condition:"Good",notes:""});setShowAddGear(false); }
+      function deleteGear(id){ setGearList(p=>p.filter(g=>g.id!==id));setDeleteConfirm(null); }
+
+      /* ── Challenges ── */
+      function chalProg(ch){ const now=new Date();if(ch.field==="totalCatches")return Math.min(catches.length,ch.target);if(ch.field==="species")return Math.min(new Set(catches.map(c=>c.species)).size,ch.target);if(ch.field==="spots")return Math.min(new Set(catches.map(c=>c.spot).filter(Boolean)).size,ch.target);if(ch.field==="bigFish")return Math.min(catches.filter(c=>parseFloat(c.length)>=20).length,ch.target);if(ch.field==="photos")return Math.min(catches.filter(c=>c.photo).length,ch.target);if(ch.field==="steelhead")return Math.min(catches.filter(c=>["Steelhead","Salmon","Coho"].some(x=>c.species?.includes(x))).length,ch.target);if(ch.field==="earlyBird")return Math.min(catches.filter(c=>new Date(c.date).getHours()<7).length,ch.target);if(ch.field==="nightOwl")return Math.min(catches.filter(c=>new Date(c.date).getHours()>=20).length,ch.target);if(ch.field==="monthCatches")return Math.min(catches.filter(c=>{const d=new Date(c.date);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).length,ch.target);return 0; }
+
+      /* ── Album ── */
+      const albumKey=`${albumDate.year}-${String(albumDate.month).padStart(2,"0")}`;
+      const grouped=groupByMonth(catches);
+      const albumCatches=grouped[albumKey]||[];
+      const canNext=()=>{const n=new Date();return !(albumDate.year===n.getFullYear()&&albumDate.month===n.getMonth());};
+      function goPrev(){setAlbumDate(p=>{let m=p.month-1,y=p.year;if(m<0){m=11;y--;}return{month:m,year:y};});}
+      function goNext(){if(!canNext())return;setAlbumDate(p=>{let m=p.month+1,y=p.year;if(m>11){m=0;y++;}return{month:m,year:y};});}
+
+      const filteredGear=gearList.filter(g=>gearFilter==="All"||g.type===gearFilter);
+
+      /* ════ PROFILE SETUP SCREEN ════ */
+      if(!profile||editingProfile){
+        return (
+          <div style={{minHeight:"100vh",background:`linear-gradient(175deg,${T.bg},#0d2218,#091a1a)`,display:"flex",flexDirection:"column",maxWidth:480,margin:"0 auto",fontFamily:T.body}}>
+            <div style={{padding:"52px 28px 24px",textAlign:"center"}}>
+              <div style={{fontSize:52,marginBottom:12}}>🎣</div>
+              <div style={{fontFamily:T.display,fontSize:32,color:T.snow,fontWeight:700}}>CastMate</div>
+              <div style={{fontSize:12,color:T.fog,marginTop:5,letterSpacing:"0.1em",textTransform:"uppercase"}}>Pacific Northwest Fishing</div>
+            </div>
+            <div style={{padding:"0 28px 40px"}}>
+              <div style={{background:"rgba(125,211,168,0.06)",border:`1px solid ${T.borderAcc}`,borderRadius:16,padding:"16px 18px",marginBottom:24}}>
+                <div style={{fontFamily:T.display,fontSize:17,color:T.accent,marginBottom:4}}>{editingProfile?"Edit Your Profile":"Welcome, Angler! 🌲"}</div>
+                <div style={{fontSize:13,color:T.fog,lineHeight:1.6}}>{editingProfile?"Update your name or avatar below.":"Set up your profile — everything is saved on this device. No account needed."}</div>
+              </div>
+              <div style={{marginBottom:20}}>
+                <Lbl>Pick Your Avatar</Lbl>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {AVATARS.map(a=><span key={a} onClick={()=>setSetupDraft(p=>({...p,avatar:a}))} style={{fontSize:26,width:46,height:46,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:12,cursor:"pointer",transition:"all .15s",background:setupDraft.avatar===a?"rgba(26,74,46,0.6)":"rgba(255,255,255,0.06)",border:setupDraft.avatar===a?`1.5px solid ${T.borderAcc}`:`1px solid ${T.border}`,transform:setupDraft.avatar===a?"scale(1.1)":"scale(1)"}}>{a}</span>)}
+                </div>
+              </div>
+              <div style={{marginBottom:16}}><Lbl>Your Name or Handle</Lbl><input value={setupDraft.username} onChange={e=>setSetupDraft(p=>({...p,username:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&saveProfile(setupDraft)} placeholder="e.g. tyler_casts, RiverDave…" style={IN}/></div>
+              <div style={{marginBottom:24}}><Lbl>Short Bio (optional)</Lbl><input value={setupDraft.bio} onChange={e=>setSetupDraft(p=>({...p,bio:e.target.value}))} placeholder="Bass chaser, fly fisherman…" style={IN}/></div>
+              {setupError&&<div style={{fontSize:13,color:T.danger,marginBottom:14,padding:"8px 12px",background:"rgba(212,117,107,0.1)",borderRadius:8,border:"1px solid rgba(212,117,107,0.2)"}}>{setupError}</div>}
+              <PrimaryBtn onClick={()=>saveProfile(setupDraft)}>{editingProfile?"Save Changes":"Start Fishing →"}</PrimaryBtn>
+              {editingProfile&&<button onClick={()=>{setEditingProfile(false);setSetupError("");}} style={{width:"100%",marginTop:10,padding:"11px",background:"transparent",border:`1px solid ${T.border}`,borderRadius:12,color:T.fog,fontFamily:T.body,fontSize:14,cursor:"pointer"}}>Cancel</button>}
+            </div>
+          </div>
+        );
+      }
+
+      /* ════ MAIN APP ════ */
+      return (
+        <div style={{minHeight:"100vh",background:`linear-gradient(175deg,${T.bg},${T.bgMid},#091a1a)`,fontFamily:T.body,color:T.snow,display:"flex",flexDirection:"column",maxWidth:480,margin:"0 auto"}}>
+
+          {/* HEADER */}
+          <div style={{padding:"13px 16px 10px",display:"flex",alignItems:"center",gap:10,background:"rgba(0,0,0,0.3)",backdropFilter:"blur(12px)",position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${T.border}`}}>
+            <span style={{fontSize:22}}>🎣</span>
+            <div>
+              <div style={{fontFamily:T.display,fontSize:18,color:T.snow,fontWeight:700}}>CastMate</div>
+              <div style={{fontSize:10,color:T.fog,fontWeight:600,letterSpacing:"0.04em"}}>{userPos?`📍 GPS live ±${userPos.acc?.toFixed(0)}m`:posError?"⚠️ "+posError:"⏳ Acquiring GPS…"}</div>
+            </div>
+            <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+              <div style={{background:"rgba(125,211,168,0.1)",border:`1px solid ${T.borderAcc}`,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700,color:T.accent}}>🌧 {WEATHER.temp}°</div>
+              <div onClick={()=>setTab("profile")} style={{width:32,height:32,borderRadius:"50%",background:tab==="profile"?"rgba(26,74,46,0.8)":"rgba(255,255,255,0.08)",border:tab==="profile"?`1.5px solid ${T.borderAcc}`:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,cursor:"pointer",transition:"all .2s"}}>{profile.avatar}</div>
+            </div>
+          </div>
+
+          {/* TABS */}
+          <div style={{display:"flex",padding:"7px 12px 5px",gap:4,background:"rgba(0,0,0,0.18)",borderBottom:`1px solid ${T.border}`}}>
+            {[["map","🗺️","Map"],["log","📔","Log"],["gear","🧰","Gear"],["strategy","🎯","Strategy"],["ai","🌲","Guide"]].map(([id,icon,label])=>(
+              <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"7px 2px",borderRadius:10,border:"none",transition:"all .2s",background:tab===id?`linear-gradient(135deg,${T.pine},#0d3320)`:"transparent",color:tab===id?T.accent:T.fog,boxShadow:tab===id?`0 2px 12px rgba(26,74,46,0.5)`:"none"}}>
+                <div style={{fontSize:16}}>{icon}</div>
+                <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.05em",marginTop:1}}>{label}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* CONTENT */}
+          <div style={{flex:1,overflowY:"auto",paddingBottom:20}}>
+
+            {/* MAP */}
+            {tab==="map"&&<div>
+              <div style={{position:"relative"}}>
+                <canvas ref={mapRef} width={480} height={290} style={{width:"100%",height:"auto",cursor:"crosshair"}} onClick={handleMapClick}/>
+                {!userPos&&<div style={{position:"absolute",bottom:10,left:"50%",transform:"translateX(-50%)",background:"rgba(14,26,20,0.88)",borderRadius:20,padding:"5px 14px",fontSize:11,color:"#fbbf24",whiteSpace:"nowrap",border:"1px solid rgba(251,191,36,0.2)"}}>{posError?"⚠️ Enable location in browser":"⏳ Waiting for GPS…"}</div>}
+              </div>
+              <div style={{padding:"9px 14px",display:"flex",gap:7,overflowX:"auto",borderBottom:`1px solid ${T.border}`}}>
+                {[["🌧",WEATHER.condition],["💨",WEATHER.wind],["🎣",`Index ${WEATHER.fishingIndex}/100`],["⏰",WEATHER.bestWindow]].map(([ic,val],i)=>(
+                  <div key={i} style={{flexShrink:0,background:T.bgCard,borderRadius:10,padding:"5px 10px",border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{ic}</span><span style={{fontSize:11,color:T.fog,fontWeight:600}}>{val}</span></div>
+                ))}
+              </div>
+              <div style={{padding:"12px 14px 0"}}>
+                <div style={{fontSize:10,color:T.fog,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:10}}>Nearby Spots</div>
+                {SPOTS.map(sp=>{
+                  const d=userPos?calcDist(userPos.lat,userPos.lng,sp.lat,sp.lng)+" mi":null,isSel=selSpot?.id===sp.id;
+                  return <Card key={sp.id} active={isSel} onClick={()=>{setSelSpot(isSel?null:sp);drawMap();}} style={{marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontFamily:T.display,fontSize:15,color:T.snow,marginBottom:2}}>{sp.name}</div>
+                        <div style={{fontSize:11,color:T.fog,fontWeight:600}}>{sp.type}{d?` · 📍 ${d}`:""} · ⭐ {sp.rating}</div>
+                      </div>
+                      <button onClick={e=>{e.stopPropagation();setTab("strategy");generateStrategy(sp);}} style={{background:"rgba(26,74,46,0.6)",border:`1px solid ${T.borderAcc}`,borderRadius:8,padding:"5px 10px",color:T.accent,fontSize:11,fontWeight:700,flexShrink:0,cursor:"pointer"}}>Strategy →</button>
+                    </div>
+                    <div style={{display:"flex",gap:5,marginTop:7,flexWrap:"wrap"}}>{sp.fish.map(f=><span key={f} style={{background:"rgba(58,107,122,0.3)",borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:600,color:"#a3c4bc",border:"1px solid rgba(58,107,122,0.3)"}}>🐟 {f}</span>)}</div>
+                    {isSel&&<div style={{marginTop:9,padding:"8px 10px",background:"rgba(26,74,46,0.25)",borderRadius:8,borderLeft:`3px solid ${T.accentDim}`,fontSize:12,color:T.mist,lineHeight:1.6}}>💡 {sp.tip}</div>}
+                  </Card>;
+                })}
+              </div>
+            </div>}
+
+            {/* CATCH LOG */}
+            {tab==="log"&&<div style={{padding:"14px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <div>
+                  <div style={{fontFamily:T.display,fontSize:22,color:T.snow}}>{MONTHS[albumDate.month]} {albumDate.year}</div>
+                  <div style={{fontSize:11,color:T.fog,marginTop:2}}>{catches.length} total · {albumCatches.length} this month</div>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={goPrev} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:9,width:34,height:34,color:T.fog,fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>‹</button>
+                  <button onClick={goNext} disabled={!canNext()} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:9,width:34,height:34,color:T.fog,fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",opacity:canNext()?1:.3}}>›</button>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:3,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
+                {Array.from({length:12},(_,i)=>{const k=`${albumDate.year}-${String(i).padStart(2,"0")}`,cnt=(grouped[k]||[]).length,isAct=i===albumDate.month;return(
+                  <div key={i} onClick={()=>setAlbumDate(p=>({...p,month:i}))} style={{flexShrink:0,width:36,borderRadius:9,padding:"5px 3px",textAlign:"center",cursor:"pointer",transition:"all .15s",background:isAct?`linear-gradient(135deg,${T.pine},#0d3320)`:"rgba(255,255,255,0.04)",border:isAct?`1px solid ${T.borderAcc}`:"1px solid transparent"}}>
+                    <div style={{fontSize:8,fontWeight:700,color:isAct?T.accent:T.fog,textTransform:"uppercase",letterSpacing:"0.05em"}}>{MONTHS[i]}</div>
+                    <div style={{fontSize:12,fontWeight:800,color:isAct?T.accent:cnt?T.mist:"rgba(255,255,255,0.15)",marginTop:1}}>{cnt||"·"}</div>
+                  </div>
+                );})}
+              </div>
+              <div style={{display:"flex",gap:8,marginBottom:14}}>
+                <button onClick={()=>setShowAddCatch(true)} style={{flex:2,padding:"11px",background:`linear-gradient(135deg,${T.pine},#0d3320)`,border:`1px solid ${T.borderAcc}`,borderRadius:12,color:T.accent,fontFamily:T.display,fontSize:15,fontWeight:600,cursor:"pointer"}}>📸 Log Catch</button>
+                <button onClick={()=>importRef.current?.click()} style={{flex:1,padding:"11px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,color:T.fog,fontSize:13,fontWeight:600,cursor:"pointer"}}>📁 Import</button>
+                <input ref={importRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handlePhoto(e,"import")}/>
+              </div>
+              {scanLoading&&<div style={{textAlign:"center",padding:"14px",marginBottom:12,background:"rgba(26,74,46,0.2)",borderRadius:12,border:`1px solid ${T.borderAcc}`}}><div style={{fontSize:22}}>🔍</div><div style={{fontSize:12,color:T.accent,marginTop:5,fontWeight:600}}>AI identifying fish…</div></div>}
+              {albumCatches.length===0?<div style={{textAlign:"center",padding:"40px 20px",opacity:.35}}><div style={{fontSize:40,marginBottom:10}}>🎣</div><div style={{fontFamily:T.display,fontSize:16}}>No catches in {MONTHS[albumDate.month]}</div></div>:(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+                  {albumCatches.map(entry=>(
+                    <div key={entry.id} onClick={()=>setSelCatch(entry)} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:14,overflow:"hidden",cursor:"pointer",transition:"all .2s"}}>
+                      {entry.photo?<div style={{height:105,backgroundImage:`url(${entry.photo})`,backgroundSize:"cover",backgroundPosition:"center",position:"relative"}}><div style={{position:"absolute",inset:0,background:"linear-gradient(0deg,rgba(14,26,20,0.8),transparent 60%)"}}/><div style={{position:"absolute",bottom:6,left:8,right:8}}><div style={{fontSize:11,fontWeight:700,color:T.snow}}>{entry.species}</div></div></div>:<div style={{height:75,background:"rgba(26,74,46,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30}}>🐟</div>}
+                      <div style={{padding:"8px 10px"}}><div style={{fontSize:13,fontWeight:600,color:T.snow,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{entry.species}</div><div style={{fontSize:10,color:T.mist,fontWeight:600,marginTop:2}}>{entry.length?`${entry.length}"`:"?"}{entry.weight?` · ${entry.weight}lb`:""}</div><div style={{fontSize:9,color:T.fog,marginTop:2}}>{entry.spot||"Unknown"} · {new Date(entry.date).toLocaleDateString()}</div></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>}
+
+            {/* GEAR */}
+            {tab==="gear"&&<div style={{padding:"14px"}}>
+              <div style={{display:"flex",gap:7,marginBottom:12}}>
+                <input value={gearSearch} onChange={e=>handleGearSearch(e.target.value)} placeholder="Search gear…" style={{...IN,flex:1,padding:"9px 12px",fontSize:13}}/>
+                <button onClick={()=>{setQrMode(p=>!p);setQrResult(null);setGearSearch("");}} style={{background:qrMode?"rgba(26,74,46,0.7)":T.bgCard,border:`1px solid ${qrMode?T.borderAcc:T.border}`,borderRadius:10,padding:"0 12px",color:qrMode?T.accent:T.fog,fontSize:12,fontWeight:700,whiteSpace:"nowrap",cursor:"pointer"}}>📷 QR</button>
+                <button onClick={()=>setShowAddGear(true)} style={{background:`linear-gradient(135deg,${T.pine},#0d3320)`,border:`1px solid ${T.borderAcc}`,borderRadius:10,padding:"0 12px",color:T.accent,fontSize:12,fontWeight:700,whiteSpace:"nowrap",cursor:"pointer"}}>+ Add</button>
+              </div>
+              {qrMode&&!gearSearch&&<Card style={{marginBottom:12}}>
+                <div style={{fontSize:12,color:T.mist,fontWeight:700,marginBottom:8}}>📷 Enter Gear QR Code</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:9}}>{GEAR_CATALOG.filter(g=>!gearList.find(x=>x.id===g.id)).slice(0,4).map(g=><span key={g.id} onClick={()=>setQrInput(g.qr)} style={{background:"rgba(58,107,122,0.2)",borderRadius:7,padding:"2px 8px",fontSize:9,fontWeight:700,color:"#a3c4bc",cursor:"pointer",border:"1px solid rgba(58,107,122,0.3)"}}>{g.qr}</span>)}</div>
+                <div style={{display:"flex",gap:7}}><input value={qrInput} onChange={e=>setQrInput(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&handleQrAdd()} placeholder="e.g. RAPALA-ORIGINAL-F07" style={{...IN,flex:1,padding:"8px 12px",fontSize:12}}/><button onClick={handleQrAdd} style={{background:`linear-gradient(135deg,${T.pine},#0d3320)`,border:`1px solid ${T.borderAcc}`,borderRadius:10,padding:"0 14px",color:T.accent,fontSize:13,fontWeight:700,cursor:"pointer"}}>Add</button></div>
+              </Card>}
+              {qrResult?.status==="search"&&<div style={{marginBottom:12}}>{qrResult.matches.length===0&&<div style={{fontSize:12,color:T.fog,textAlign:"center",padding:"8px 0"}}>No new items found</div>}{qrResult.matches.map(g=><div key={g.id} onClick={()=>{setGearList(p=>[...p,g]);setQrResult({status:"search",matches:qrResult.matches.filter(x=>x.id!==g.id)});}} style={{background:T.bgCard,border:`1px solid ${T.borderAcc}`,borderRadius:11,padding:"10px 12px",marginBottom:6,cursor:"pointer",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20}}>{TYPE_ICO[g.type]||"📦"}</span><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{g.name}</div><div style={{fontSize:10,color:T.fog}}>{g.brand} · {g.type}</div></div><span style={{fontSize:18,color:T.accent}}>＋</span></div>)}</div>}
+              {qrResult?.status==="added"&&<div style={{background:"rgba(125,211,168,0.08)",border:`1px solid ${T.borderAcc}`,borderRadius:9,padding:"8px 12px",marginBottom:10,fontSize:12,color:T.accent}}>✅ Added <strong>{qrResult.item.name}</strong></div>}
+              {qrResult?.status==="notfound"&&<div style={{background:"rgba(212,117,107,0.08)",border:"1px solid rgba(212,117,107,0.25)",borderRadius:9,padding:"8px 12px",marginBottom:10,fontSize:12,color:T.danger}}>❌ No gear found for: {qrResult.code}</div>}
+              {qrResult?.status==="already"&&<div style={{background:"rgba(232,168,124,0.08)",border:"1px solid rgba(232,168,124,0.25)",borderRadius:9,padding:"8px 12px",marginBottom:10,fontSize:12,color:T.warning}}>⚠️ Already in your tackle box</div>}
+              <div style={{display:"flex",gap:5,marginBottom:12,flexWrap:"wrap"}}>{["All","Rod","Reel","Line","Lure","Bait","Other"].map(f=><Pill key={f} active={gearFilter===f} onClick={()=>setGearFilter(f)}>{f}</Pill>)}</div>
+              <div style={{fontSize:11,color:T.fog,marginBottom:9}}>{filteredGear.length} item{filteredGear.length!==1?"s":""} · Tap 🗑️ to remove</div>
+              {filteredGear.map(item=>{const isConf=deleteConfirm===item.id;return(
+                <div key={item.id} style={{marginBottom:9}}>
+                  <div style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:14,display:"flex",alignItems:"stretch",overflow:"hidden"}}>
+                    <div style={{flex:1,padding:"11px 13px",display:"flex",gap:10,alignItems:"flex-start"}}>
+                      <div style={{width:38,height:38,background:"rgba(26,74,46,0.4)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,border:`1px solid ${T.border}`}}>{TYPE_ICO[item.type]||"📦"}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:6,marginBottom:2}}>
+                          <div style={{fontSize:14,fontWeight:600,color:T.snow,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</div>
+                          <span style={{padding:"2px 7px",borderRadius:7,fontSize:9,fontWeight:800,flexShrink:0,background:`${COND_CLR[item.condition]||T.accent}18`,color:COND_CLR[item.condition]||T.accent,border:`1px solid ${COND_CLR[item.condition]||T.accent}33`}}>{item.condition}</span>
+                        </div>
+                        <div style={{fontSize:11,color:T.fog}}>{item.brand||"Custom"} · {item.weight||item.type}</div>
+                        {item.notes&&<div style={{fontSize:11,color:"rgba(184,212,200,0.5)",marginTop:2,lineHeight:1.4}}>{item.notes}</div>}
+                      </div>
+                    </div>
+                    <button onClick={()=>setDeleteConfirm(isConf?null:item.id)} style={{width:46,background:isConf?"rgba(212,117,107,0.2)":"rgba(212,117,107,0.06)",border:"none",borderLeft:`1px solid ${T.border}`,color:isConf?T.danger:"rgba(212,117,107,0.4)",fontSize:17,transition:"all .2s",flexShrink:0,cursor:"pointer"}}>🗑️</button>
+                  </div>
+                  {isConf&&<div style={{display:"flex",gap:6,marginTop:4}}><button onClick={()=>deleteGear(item.id)} style={{flex:1,padding:"8px",background:"rgba(212,117,107,0.16)",border:"1px solid rgba(212,117,107,0.3)",borderRadius:9,color:T.danger,fontSize:12,fontWeight:700,cursor:"pointer"}}>Confirm Delete</button><button onClick={()=>setDeleteConfirm(null)} style={{flex:1,padding:"8px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:9,color:T.fog,fontSize:12,fontWeight:700,cursor:"pointer"}}>Keep It</button></div>}
+                </div>
+              );})}
+            </div>}
+
+            {/* STRATEGY */}
+            {tab==="strategy"&&<div style={{padding:"14px"}}>
+              <div style={{fontFamily:T.display,fontSize:20,color:T.snow,marginBottom:6}}>🎯 AI Fishing Strategy</div>
+              <div style={{fontSize:12,color:T.fog,marginBottom:14,lineHeight:1.6}}>Pick a spot for a personalized plan based on your tackle box and current conditions.</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:16}}>{SPOTS.map(sp=><Pill key={sp.id} active={stratSpot?.id===sp.id} onClick={()=>generateStrategy(sp)}>{sp.name}</Pill>)}</div>
+              {!stratSpot&&<div style={{textAlign:"center",padding:"40px 20px",opacity:.3}}><div style={{fontSize:36,marginBottom:8}}>🌲</div><div style={{fontFamily:T.display,fontSize:16}}>Pick a spot above</div></div>}
+              {stratLoading&&<div style={{textAlign:"center",padding:"40px 0"}}><div style={{fontSize:32,marginBottom:10}}>🌲</div><div style={{fontSize:13,color:T.fog}}>Consulting the forest spirits…</div></div>}
+              {stratResult&&!stratLoading&&<div>
+                <Card active style={{marginBottom:10}}><div style={{fontSize:10,color:T.accent,fontWeight:800,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>🎯 {stratSpot.name}</div><div style={{fontSize:13,color:T.mist,lineHeight:1.7}}>{stratResult.overview}</div></Card>
+                {stratResult.timing&&<Card style={{marginBottom:8,display:"flex",gap:10}}><span style={{fontSize:20}}>⏰</span><div><div style={{fontSize:10,color:T.gold,fontWeight:800,textTransform:"uppercase",marginBottom:3}}>Best Timing</div><div style={{fontSize:12,lineHeight:1.6,color:T.mist}}>{stratResult.timing}</div></div></Card>}
+                {stratResult.rigging&&<Card style={{marginBottom:8,display:"flex",gap:10}}><span style={{fontSize:20}}>🪝</span><div><div style={{fontSize:10,color:T.mist,fontWeight:800,textTransform:"uppercase",marginBottom:3}}>Rig Setup</div><div style={{fontSize:12,lineHeight:1.6,color:T.mist}}>{stratResult.rigging}</div></div></Card>}
+                {stratResult.techniques?.map((t,i)=><Card key={i} style={{marginBottom:7}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><div style={{fontSize:14,fontWeight:600,color:T.snow}}>{t.name}</div><span style={{padding:"2px 8px",borderRadius:8,fontSize:9,fontWeight:800,background:t.difficulty==="Beginner"?"rgba(125,211,168,0.12)":t.difficulty==="Intermediate"?"rgba(201,162,39,0.12)":"rgba(212,117,107,0.12)",color:t.difficulty==="Beginner"?T.accent:t.difficulty==="Intermediate"?T.gold:T.danger}}>{t.difficulty}</span></div><div style={{fontSize:12,lineHeight:1.6,color:T.mist,marginBottom:4}}>{t.description}</div>{t.gearMatch&&<div style={{fontSize:11,color:T.accentDim,fontWeight:600}}>🧰 {t.gearMatch}</div>}</Card>)}
+                {stratResult.proTip&&<Card style={{display:"flex",gap:10,background:"rgba(201,162,39,0.06)",borderColor:"rgba(201,162,39,0.2)"}}><span style={{fontSize:20}}>⭐</span><div><div style={{fontSize:10,color:T.gold,fontWeight:800,textTransform:"uppercase",marginBottom:3}}>Pro Tip</div><div style={{fontSize:12,lineHeight:1.6,color:"#e8d88a"}}>{stratResult.proTip}</div></div></Card>}
+              </div>}
+            </div>}
+
+            {/* AI GUIDE */}
+            {tab==="ai"&&<div style={{padding:"14px",paddingBottom:75}}>
+              <div style={{fontFamily:T.display,fontSize:20,color:T.snow,marginBottom:14}}>🌲 PNW Fishing Guide</div>
+              {aiMessages.map((msg,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start",marginBottom:10}}>
+                  {msg.role==="assistant"&&<span style={{fontSize:18,marginRight:7,alignSelf:"flex-end"}}>🌲</span>}
+                  <div style={{maxWidth:"78%",padding:"10px 13px",borderRadius:msg.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",background:msg.role==="user"?`linear-gradient(135deg,${T.pine},#0d3320)`:"rgba(255,255,255,0.06)",border:msg.role==="assistant"?`1px solid ${T.border}`:"none",fontSize:13,lineHeight:1.6,color:msg.role==="user"?T.mist:T.snow}}>{msg.text}</div>
+                </div>
+              ))}
+              {aiLoading&&<div style={{display:"flex",gap:8,alignItems:"flex-end",marginBottom:10}}><span style={{fontSize:18}}>🌲</span><div style={{padding:"10px 14px",background:"rgba(255,255,255,0.06)",borderRadius:"16px 16px 16px 4px",display:"flex",gap:5}}><div style={{width:6,height:6,borderRadius:"50%",background:T.accent}}/><div style={{width:6,height:6,borderRadius:"50%",background:T.accent,opacity:.6}}/><div style={{width:6,height:6,borderRadius:"50%",background:T.accent,opacity:.3}}/></div></div>}
+              {aiMessages.length<=1&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:4}}>{["Best spot this week?","What's biting in the rain?","Steelhead tips?","Best flies for cutthroat?","Gear for Snoqualmie?"].map(q=><span key={q} onClick={()=>setAiInput(q)} style={{padding:"6px 12px",borderRadius:18,fontSize:11,fontWeight:600,cursor:"pointer",background:"rgba(26,74,46,0.3)",border:`1px solid ${T.borderAcc}`,color:T.mist}}>{q}</span>)}</div>}
+              <div ref={chatEnd}/>
+              <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,padding:"10px 14px 18px",background:`linear-gradient(0deg,${T.bg} 55%,transparent)`,display:"flex",gap:8}}>
+                <input value={aiInput} onChange={e=>setAiInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendAi()} placeholder="Ask your PNW fishing guide…" style={{...IN,flex:1,borderRadius:22,padding:"10px 16px"}}/>
+                <button onClick={sendAi} disabled={aiLoading} style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${T.pine},#0d3320)`,border:`1px solid ${T.borderAcc}`,fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,opacity:aiLoading?.4:1,cursor:"pointer"}}>🌲</button>
+              </div>
+            </div>}
+
+            {/* PROFILE */}
+            {tab==="profile"&&<div style={{padding:"14px"}}>
+              <div style={{background:`linear-gradient(135deg,rgba(26,74,46,0.35),rgba(14,26,20,0.4))`,border:`1px solid ${T.borderAcc}`,borderRadius:18,padding:18,marginBottom:16,display:"flex",gap:14,alignItems:"center"}}>
+                <div style={{width:62,height:62,borderRadius:"50%",background:"rgba(125,211,168,0.1)",border:`2px solid ${T.borderAcc}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,flexShrink:0}}>{profile.avatar}</div>
+                <div style={{flex:1}}><div style={{fontFamily:T.display,fontSize:20,color:T.snow}}>{profile.username}</div>{profile.bio&&<div style={{fontSize:12,color:T.fog,marginTop:4,lineHeight:1.5}}>{profile.bio}</div>}<div style={{fontSize:10,color:T.accentDim,marginTop:5,fontWeight:600}}>📱 Saved on this device</div></div>
+              </div>
+              <button onClick={()=>{setSetupDraft({username:profile.username,avatar:profile.avatar,bio:profile.bio||""});setSetupError("");setEditingProfile(true);}} style={{width:"100%",padding:"11px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,color:T.fog,fontSize:13,fontWeight:600,marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:8,cursor:"pointer"}}>✏️ Edit Profile</button>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>{[["🐟","Catches",catches.length],["🔭","Species",new Set(catches.map(c=>c.species)).size],["📍","Spots",new Set(catches.map(c=>c.spot).filter(Boolean)).size]].map(([icon,label,val])=><div key={label} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:13,padding:"12px 8px",textAlign:"center"}}><div style={{fontSize:20,marginBottom:4}}>{icon}</div><div style={{fontFamily:T.display,fontSize:22,color:T.accent}}>{val}</div><div style={{fontSize:9,color:T.fog,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginTop:2}}>{label}</div></div>)}</div>
+              <div style={{fontFamily:T.display,fontSize:18,color:T.snow,marginBottom:12}}>🏆 Challenges</div>
+              {CHALLENGES.map(ch=>{const prog=chalProg(ch),done=prog>=ch.target,pct=Math.min(100,(prog/ch.target)*100);return(
+                <Card key={ch.id} active={done} style={{marginBottom:8}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                    <div style={{fontSize:22,flexShrink:0,opacity:done?1:.55,filter:done?"drop-shadow(0 0 6px rgba(125,211,168,0.4))":"none"}}>{ch.icon}</div>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}><div style={{fontSize:14,fontWeight:600,color:done?T.accent:T.snow}}>{ch.title}{done?" ✓":""}</div><span style={{padding:"2px 8px",borderRadius:8,fontSize:9,fontWeight:800,background:`${TIER_CLR[ch.tier]}18`,color:TIER_CLR[ch.tier],textTransform:"uppercase",letterSpacing:"0.05em"}}>{ch.tier}</span></div>
+                      <div style={{fontSize:11,color:T.fog,marginBottom:7,lineHeight:1.5}}>{ch.desc}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{flex:1}}><Bar pct={pct} done={done}/></div><div style={{fontSize:10,fontWeight:800,color:done?T.accent:T.fog,whiteSpace:"nowrap"}}>{prog}/{ch.target}</div><div style={{fontSize:10,color:T.gold,fontWeight:700}}>+{ch.xp} XP</div></div>
+                    </div>
+                  </div>
+                </Card>
+              );})}
+              <div style={{marginTop:20,padding:"14px",background:"rgba(212,117,107,0.05)",border:`1px solid ${clearConfirm?"rgba(212,117,107,0.4)":"rgba(212,117,107,0.15)"}`,borderRadius:13,transition:"border .2s"}}>
+                <div style={{fontSize:12,color:T.fog,marginBottom:10,lineHeight:1.6}}>⚠️ All your data is saved locally on this device. Clearing it will permanently remove your catches, gear, and profile.</div>
+                {!clearConfirm?<button onClick={()=>setClearConfirm(true)} style={{width:"100%",padding:"10px",background:"transparent",border:"1px solid rgba(212,117,107,0.3)",borderRadius:10,color:T.danger,fontSize:13,fontWeight:600,cursor:"pointer"}}>🗑️ Clear All Local Data</button>:(
+                  <div>
+                    <div style={{fontSize:13,color:T.danger,fontWeight:700,textAlign:"center",marginBottom:12,padding:"10px",background:"rgba(212,117,107,0.1)",borderRadius:9}}>Are you sure? This cannot be undone.</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>{localStorage.removeItem("cm_catches");localStorage.removeItem("cm_gear");localStorage.removeItem("cm_profile");setClearConfirm(false);setProfile(null);setCatches([]);setGearList(GEAR_CATALOG.slice(0,5));setSetupDraft({username:"",avatar:"🎣",bio:""});setEditingProfile(false);}} style={{flex:1,padding:"11px",background:"rgba(212,117,107,0.2)",border:"1px solid rgba(212,117,107,0.45)",borderRadius:10,color:T.danger,fontSize:13,fontWeight:700,cursor:"pointer"}}>Yes, clear everything</button>
+                      <button onClick={()=>setClearConfirm(false)} style={{flex:1,padding:"11px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,color:T.fog,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>}
+          </div>
+
+          {/* SHEETS */}
+          <Sheet show={showAddCatch} onClose={()=>setShowAddCatch(false)} title="📸 Log a Catch">
+            <div onClick={()=>photoRef.current?.click()} style={{height:130,background:newCatch.photo?`url(${newCatch.photo}) center/cover no-repeat`:"rgba(26,74,46,0.25)",border:`2px dashed ${T.borderAcc}`,borderRadius:14,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",marginBottom:14,overflow:"hidden",backgroundSize:"cover"}}>
+              {!newCatch.photo&&!scanLoading&&<div style={{textAlign:"center",opacity:.6}}><div style={{fontSize:30}}>📷</div><div style={{fontSize:12,marginTop:4,color:T.mist}}>Tap to take or upload photo</div><div style={{fontSize:10,color:T.fog,marginTop:2}}>AI will identify species & estimate size</div></div>}
+              {scanLoading&&<div style={{textAlign:"center"}}><div style={{fontSize:26}}>🔍</div><div style={{fontSize:11,color:T.accent,marginTop:3}}>Scanning fish…</div></div>}
+            </div>
+            <input ref={photoRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>handlePhoto(e,"new")}/>
+            {newCatch._scan&&<div style={{background:"rgba(125,211,168,0.07)",border:`1px solid ${T.borderAcc}`,borderRadius:10,padding:"8px 12px",marginBottom:12,fontSize:12,color:T.mist}}><span style={{color:T.accent,fontWeight:700}}>🤖 AI: </span>{newCatch._scan.commonName||newCatch._scan.species} — {newCatch._scan.estimatedLength}, {newCatch._scan.estimatedWeight} · <span style={{color:newCatch._scan.confidence==="High"?T.accent:newCatch._scan.confidence==="Medium"?T.gold:T.danger}}>{newCatch._scan.confidence} confidence</span></div>}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>{[["species","Species"],["length","Length (in.)"],["weight","Weight (lbs)"],["lure","Lure or Bait"]].map(([k,ph])=><div key={k}><Lbl>{ph}</Lbl><input value={newCatch[k]||""} onChange={e=>setNewCatch(p=>({...p,[k]:e.target.value}))} placeholder={ph} style={{...IN,padding:"8px 12px",fontSize:13}}/></div>)}</div>
+            <div style={{marginBottom:10}}><Lbl>Spot</Lbl><select value={newCatch.spot||""} onChange={e=>setNewCatch(p=>({...p,spot:e.target.value}))} style={{...IN,padding:"8px 12px",fontSize:13}}><option value="">Select a spot…</option>{SPOTS.map(sp=><option key={sp.id} value={sp.name}>{sp.name}</option>)}</select></div>
+            <div style={{marginBottom:16}}><Lbl>Notes</Lbl><textarea value={newCatch.notes||""} onChange={e=>setNewCatch(p=>({...p,notes:e.target.value}))} placeholder="How'd you hook it?" rows={2} style={{...IN,padding:"8px 12px",fontSize:13,resize:"none"}}/></div>
+            <PrimaryBtn onClick={saveCatch}>Save Catch 🐟</PrimaryBtn>
+          </Sheet>
+
+          <Sheet show={showAddGear} onClose={()=>setShowAddGear(false)} title="🧰 Add Gear">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div style={{gridColumn:"1/-1"}}><Lbl>Item Name</Lbl><input value={newGear.name||""} onChange={e=>setNewGear(p=>({...p,name:e.target.value}))} placeholder="e.g. Shimano Stradic 2500" style={{...IN,padding:"8px 12px",fontSize:13}}/></div>
+              <div><Lbl>Brand</Lbl><input value={newGear.brand||""} onChange={e=>setNewGear(p=>({...p,brand:e.target.value}))} placeholder="e.g. Shimano" style={{...IN,padding:"8px 12px",fontSize:13}}/></div>
+              <div><Lbl>Weight / Size</Lbl><input value={newGear.weight||""} onChange={e=>setNewGear(p=>({...p,weight:e.target.value}))} placeholder="e.g. 2500, 12lb" style={{...IN,padding:"8px 12px",fontSize:13}}/></div>
+              <div><Lbl>Type</Lbl><select value={newGear.type} onChange={e=>setNewGear(p=>({...p,type:e.target.value}))} style={{...IN,padding:"8px 12px",fontSize:13}}>{["Rod","Reel","Line","Lure","Bait","Other"].map(t=><option key={t}>{t}</option>)}</select></div>
+              <div><Lbl>Condition</Lbl><select value={newGear.condition} onChange={e=>setNewGear(p=>({...p,condition:e.target.value}))} style={{...IN,padding:"8px 12px",fontSize:13}}>{["Great","Good","Replace Soon","Replace"].map(c=><option key={c}>{c}</option>)}</select></div>
+            </div>
+            <div style={{marginBottom:16}}><Lbl>Notes</Lbl><textarea value={newGear.notes||""} onChange={e=>setNewGear(p=>({...p,notes:e.target.value}))} placeholder="Anything worth remembering…" rows={2} style={{...IN,padding:"8px 12px",fontSize:13,resize:"none"}}/></div>
+            <PrimaryBtn onClick={addCustomGear}>Add to Tackle Box 🎣</PrimaryBtn>
+          </Sheet>
+
+          <Sheet show={!!selCatch} onClose={()=>setSelCatch(null)} title={selCatch?.species||""}>
+            {selCatch&&<>
+              {selCatch.photo&&<div style={{height:200,backgroundImage:`url(${selCatch.photo})`,backgroundSize:"cover",backgroundPosition:"center",borderRadius:14,marginBottom:16}}/>}
+              <div style={{fontSize:11,color:T.mist,fontWeight:600,marginBottom:14}}>{selCatch.spot||"Unknown spot"} · {new Date(selCatch.date).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>{[["📏","Length",selCatch.length?`${selCatch.length}"`:"—"],["⚖️","Weight",selCatch.weight?`${selCatch.weight} lbs`:"—"],["🪝","Lure",selCatch.lure||"—"]].map(([ico,lb,val])=><div key={lb} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:11,padding:"10px 6px",textAlign:"center"}}><div style={{fontSize:17}}>{ico}</div><div style={{fontFamily:T.display,fontSize:14,color:T.accent,marginTop:3}}>{val}</div><div style={{fontSize:8,color:T.fog,textTransform:"uppercase",letterSpacing:"0.06em",marginTop:2}}>{lb}</div></div>)}</div>
+              {selCatch.notes&&<div style={{fontSize:13,color:T.fog,lineHeight:1.7,marginBottom:14,padding:"10px 12px",background:T.bgCard,borderRadius:10,borderLeft:`3px solid ${T.accentDim}`}}>💬 {selCatch.notes}</div>}
+              {selCatch._scan&&<Card><div style={{fontSize:11,color:T.accent,fontWeight:700,marginBottom:6}}>🤖 AI Fish ID</div><div style={{fontSize:12,color:T.mist,lineHeight:1.7}}>{selCatch._scan.characteristics}</div>{selCatch._scan.notes&&<div style={{fontSize:11,color:T.fog,marginTop:6,lineHeight:1.5}}>{selCatch._scan.notes}</div>}</Card>}
+            </>}
+          </Sheet>
+        </div>
+      );
+    }
+
+    // Mount
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(React.createElement(CastMate));
+
+    // Register service worker
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js")
+          .then(r => console.log("SW registered:", r.scope))
+          .catch(e => console.log("SW failed:", e));
+      });
+    }
+  </script>
+
+</body>
+</html>
